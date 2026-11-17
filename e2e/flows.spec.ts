@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Flow tests: each test starts from a fresh phone (empty storage).
 
-const CUISINES = ["American", "South Indian", "North Indian", "Chinese", "Mexican", "Italian", "Mediterranean"];
+const CUISINES = ["American", "South Indian", "North Indian", "Chinese", "Mexican", "Italian", "Mediterranean",
+  "Thai", "Japanese", "Korean", "Vietnamese"];
 const DIETS = ["Everything", "Vegetarian + eggs", "Vegetarian"];
 
 interface Setup {

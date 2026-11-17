@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../data/dishes";
 import { TEMPLATES } from "../data/templates";
-import { DAYS, slotKey, type Profile, type WeekPlan } from "../data/types";
+import { CUISINE_LABEL, DAYS, slotKey, type Cuisine, type Profile, type WeekPlan } from "../data/types";
 import { mondayOf, planningWeek } from "./dates";
 import { draftWeek, eatenHistory } from "./draft";
 import { buildList, canonicalName, formatQty, listAsText } from "./shopping";
@@ -36,6 +36,44 @@ describe("catalog", () => {
         const ok = CATALOG.some((d) => s.categories.includes(d.category) && t.meals.some((m) => d.meals.includes(m)));
         expect(ok, `${t.id}/${s.id}`).toBe(true);
         if (s.defaultDishId) expect(dishes.has(s.defaultDishId), s.defaultDishId).toBe(true);
+      }
+    }
+  });
+});
+
+describe("cuisines", () => {
+  const ALL = Object.keys(CUISINE_LABEL) as Cuisine[];
+  const of = (c: Cuisine) => CATALOG.filter((d) => d.cuisine === c);
+
+  // 2026-11-17: added with Thai, Japanese, Korean and Vietnamese, so no cuisine picked alone leaves a vegetarian empty.
+  it("every cuisine has pre-ticked, vegetarian breakfast and one-dish options", () => {
+    for (const c of ALL) {
+      const ds = of(c);
+      expect(ds.some((d) => d.popular && d.diet === "veg"), `${c} popular veg`).toBe(true);
+      expect(ds.some((d) => d.category === "breakfast" && d.diet === "veg"), `${c} veg breakfast`).toBe(true);
+      expect(ds.some((d) => d.category === "main" && d.diet === "veg"), `${c} veg one-dish`).toBe(true);
+    }
+  });
+
+  it("the newer cuisines fill every dish role on their own", () => {
+    const roles = ["breakfast", "main", "protein", "veg", "dal", "starch", "salad"] as const;
+    for (const c of ["thai", "japanese", "korean", "vietnamese", "mexican", "italian", "mediterranean"] as Cuisine[]) {
+      for (const r of roles) expect(of(c).some((d) => d.category === r), `${c} ${r}`).toBe(true);
+    }
+  });
+
+  it("a single new cuisine drafts a full week", () => {
+    for (const c of ["thai", "japanese", "korean", "vietnamese"] as Cuisine[]) {
+      const p = profile({
+        cuisines: [c],
+        defaults: { breakfast: "breakfast-one", lunch: "one-dish", dinner: "rice-and-dishes" },
+        library: of(c).map((d) => d.id),
+      });
+      const plan = draftWeek("2026-11-23", p, dishes, []);
+      for (const day of DAYS) {
+        for (const meal of ["breakfast", "lunch", "dinner"] as const) {
+          for (const it of plan.slots[slotKey(day, meal)]!.items) expect(it.dishId, `${c} ${day} ${meal} ${it.slotId}`).not.toBeNull();
+        }
       }
     }
   });
