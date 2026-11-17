@@ -171,3 +171,15 @@ main { padding: 12px 16px; }
   .ing-row { grid-template-columns: 1fr 70px 70px; }
   .ing-row select:last-child { grid-column: 1 / -1; }
 }
+
+/* Nutrition */
+.day-nutrition { padding: 0 14px 10px; margin-top: -6px; }
+.dish .kcal { grid-column: 1 / -1; font-style: normal; color: var(--muted); font-size: 12px; }
+.pick { display: grid; gap: 4px; }
+.pick small { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; }
+.tag { font-weight: 500; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--text); }
+.li-name small .tag { margin-left: 6px; }
+.body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.body-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.body-grid input, .body-grid select { width: 100%; min-width: 0; }
+.target { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
