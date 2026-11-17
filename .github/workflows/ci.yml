@@ -1,0 +1,45 @@
+# Runs the same checks as locally on every pull request and every push to main:
+# type check, logic tests, production build, and the phone-sized flow tests.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Logic tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install browser for flow tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Flow tests
+        run: npm run test:e2e
