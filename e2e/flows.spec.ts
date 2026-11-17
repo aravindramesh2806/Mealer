@@ -11,6 +11,9 @@ interface Setup {
   cuisines?: string[];
   /** Card name per meal (breakfast, lunch, dinner); omitted = keep the suggested one. */
   patterns?: (string | undefined)[];
+  goals?: string[];
+  /** Fill the calorie step (metric); omitted = Skip. */
+  body?: { height: string; weight: string; age: string; sex: "Female" | "Male"; aim: "Lose" | "Keep" | "Gain" };
 }
 
 /** Watch for crashes so a test fails on any uncaught page error. */
@@ -24,7 +27,20 @@ async function onboard(page: Page, s: Setup = {}) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Who are you cooking for?" })).toBeVisible();
   await page.getByRole("button", { name: s.diet ?? "Everything", exact: true }).click();
+  for (const g of s.goals ?? []) await page.getByRole("button", { name: g, exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
+
+  await expect(page.getByRole("heading", { name: "Want a calorie target?" })).toBeVisible();
+  if (s.body) {
+    await page.getByLabel("Height (cm)").fill(s.body.height);
+    await page.getByLabel("Weight (kg)").fill(s.body.weight);
+    await page.getByLabel("Age").fill(s.body.age);
+    await page.getByLabel("Sex (for the formula)").selectOption({ label: s.body.sex });
+    await page.getByRole("button", { name: s.body.aim, exact: true }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+  } else {
+    await page.getByRole("button", { name: "Skip" }).click();
+  }
 
   for (const c of s.cuisines ?? ["South Indian", "American"]) {
     await page.getByRole("button", { name: c, exact: true }).click();
@@ -77,6 +93,7 @@ test.describe("onboarding creates a plan", () => {
     const errors = trackErrors(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Skip" }).click();
     await page.getByRole("button", { name: "Italian", exact: true }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -95,6 +112,7 @@ test.describe("onboarding creates a plan", () => {
 test("everyday basics are on by default with any cuisine", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Skip" }).click();
   await expect(page.getByRole("button", { name: "Everyday basics", exact: true })).toHaveClass(/sel/);
   await page.getByRole("button", { name: "Thai", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
@@ -125,7 +143,7 @@ test.describe("using the plan", () => {
     await first.click();
     await expect(page.locator(".sheet")).toBeVisible();
     const choice = page.locator(".pick:not(.sel):not(.ghost)").first();
-    const picked = await choice.innerText();
+    const picked = await choice.locator("span").innerText();
     await choice.click();
     await expect(page.locator(".sheet")).toHaveCount(0);
     await expect(first.locator("span")).toHaveText(picked);
@@ -206,5 +224,83 @@ test.describe("using the plan", () => {
     await page.getByRole("button", { name: "Next week" }).click();
     await page.getByRole("button", { name: "Draft this week for me" }).click();
     await expect(page.locator(".day")).toHaveCount(7);
+  });
+});
+
+test.describe("nutrition, goals and calorie target", () => {
+  const body = { height: "175", weight: "75", age: "30", sex: "Male", aim: "Lose" } as const;
+
+  test("calorie step shows the target and the week tracks it", async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Next" }).click();
+    const next = page.getByRole("button", { name: "Next" });
+    await expect(next).toBeDisabled();
+    await expect(page.getByText("Enter height, weight and age")).toBeVisible();
+    await page.getByLabel("Height (cm)").fill("175");
+    await page.getByLabel("Weight (kg)").fill("75");
+    await page.getByLabel("Age").fill("30");
+    await page.getByLabel("Sex (for the formula)").selectOption("male");
+    await page.getByLabel("How active are you?").selectOption("moderate");
+    await page.getByRole("button", { name: "Lose", exact: true }).click();
+    await expect(page.locator(".target-num")).toHaveText("≈ 2,130 kcal · 120 g protein");
+    await page.getByRole("button", { name: "lb · in" }).click();
+    await expect(page.getByLabel("Weight (lb)")).toHaveValue("165");
+    await expect(page.locator(".target-num")).toContainText("2,130");
+    await next.click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: /Plan my week/ }).click();
+    const monday = page.getByLabel("Monday nutrition per person");
+    await expect(monday).toContainText("of 2,130");
+    await expect(monday).toContainText("of 120 g");
+    await expect(monday).toContainText("Carbs");
+    await expect(monday).toContainText("Fat");
+    await expect(monday.getByRole("img")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("skipping the calorie step still shows estimates, no target", async ({ page }) => {
+    await onboard(page);
+    const monday = page.getByLabel("Monday nutrition per person");
+    await expect(monday).toContainText("Calories");
+    await expect(monday).not.toContainText("of ");
+    await expect(page.locator(".dish .kcal").first()).toContainText("g carbs");
+  });
+
+  test("goals and calorie aim show in the swap sheet", async ({ page }) => {
+    await onboard(page, { goals: ["High protein"], body });
+    await page.locator(".dish").first().click();
+    await expect(page.locator(".aim")).toContainText("Aim here: about");
+    await expect(page.locator(".aim")).toContainText("High protein");
+    await expect(page.locator(".pick small").first()).toContainText("kcal");
+  });
+
+  test("dishes can be filtered by goal", async ({ page }) => {
+    await onboard(page, { cuisines: ["American"] });
+    await page.locator(".tabs button", { hasText: "Dishes" }).click();
+    const all = await page.locator(".dishes .li").count();
+    await page.getByRole("group", { name: "Filter by goal" }).getByRole("button", { name: "High protein" }).click();
+    const rows = page.locator(".dishes .li");
+    const n = await rows.count();
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThan(all);
+    for (let k = 0; k < n; k++) await expect(rows.nth(k).locator(".tag", { hasText: "High protein" })).toHaveCount(1);
+  });
+
+  test("settings can add, change and remove the target", async ({ page }) => {
+    page.on("dialog", (d) => d.accept());
+    await onboard(page);
+    await page.locator(".tabs button", { hasText: "Settings" }).click();
+    await page.getByLabel("Height (cm)").fill("160");
+    await page.getByLabel("Weight (kg)").fill("60");
+    await page.getByLabel("Age").fill("40");
+    await expect(page.locator(".target-num")).toContainText("kcal");
+    await page.getByRole("button", { name: "Re-draft this week" }).click();
+    await expect(page.getByLabel("Monday nutrition per person")).toContainText("of ");
+    await page.locator(".tabs button", { hasText: "Settings" }).click();
+    await page.getByRole("button", { name: "Remove my details" }).click();
+    await page.locator(".tabs button", { hasText: "Week" }).click();
+    await expect(page.getByLabel("Monday nutrition per person")).not.toContainText("of ");
   });
 });

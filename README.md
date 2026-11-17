@@ -7,6 +7,7 @@ Plan your week of home meals on Sunday, get one shopping list, and shop once.
 - **Rotation.** The weekly draft puts dishes you haven't had in a while first and avoids repeats within N days (you choose N).
 - **Add-ons.** Chutney and vada with idli, almonds on oats, garlic bread with pasta. They go on the list too.
 - **One shopping list.** Scaled by people × times eaten, duplicates merged, grouped by store section, pantry staples shown separately, shareable to WhatsApp.
+- **Nutrition and goals.** Estimated calories, protein, carbs and fat per dish, meal and day. Optional diet goals (high protein, low fat, low carb, lighter meals) and an optional calorie target from height, weight, age and activity steer the weekly draft.
 - **Private and free.** Everything is stored on the phone. No account, no server.
 
 ## Run it
@@ -36,12 +37,14 @@ On a phone, open the link and use **Add to Home Screen** (Safari share menu on i
 | `src/data/dishes.ts` | Starter catalog (~200 dishes, per-serving quantities) |
 | `src/data/templates.ts` | Meal patterns |
 | `src/logic/draft.ts` | Week drafting and swap ranking (rules + history, no AI) |
+| `src/data/nutrition.ts` | Approximate nutrition per ingredient (per 100 g/ml or per piece) |
+| `src/logic/nutrition.ts` | Dish/meal/day estimates, goal tags, calorie target (Mifflin–St Jeor), per-slot calorie budget |
 | `src/logic/shopping.ts` | Shopping list: scaling, merging, formatting, share text |
 | `src/logic/storage.ts` | Saves to the device (localStorage), backup/restore |
 | `src/components/` | Onboarding, Week, List, Dishes, Settings screens |
 
 ## Roadmap
 
-- **v1.5:** pack-size rounding, pantry memory, leftovers, family sync
+- **v1.5:** pack-size rounding, pantry memory, leftovers, family sync, per-person targets
 - **v2:** "Make it at home": family recipes and restaurant-style favourites, recipe steps, rating after cooking
-- **v3:** photo/voice recipe capture, grocery ordering links, nutrition
+- **v3:** photo/voice recipe capture, grocery ordering links

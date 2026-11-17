@@ -2,10 +2,13 @@ import { useMemo, useState } from "react";
 import { CATALOG } from "../data/dishes";
 import { TEMPLATES } from "../data/templates";
 import {
-  CATEGORY_LABEL, CUISINE_LABEL, MEALS,
-  type Category, type Cuisine, type DietPref, type Meal, type Profile,
+  CATEGORY_LABEL, CUISINE_LABEL, GOAL_LABEL, MEALS,
+  type Category, type Cuisine, type DietPref, type Goal, type Meal, type Profile,
 } from "../data/types";
 import { dietAllows } from "../logic/draft";
+import { BodyForm, bodyFromDraft, emptyDraft, type BodyDraft } from "./BodyForm";
+
+const GOALS = Object.keys(GOAL_LABEL) as Goal[];
 
 const ALL_CUISINES = Object.keys(CUISINE_LABEL) as Cuisine[];
 const MEAL_LABEL: Record<Meal, string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
@@ -26,6 +29,9 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   const [cuisines, setCuisines] = useState<Cuisine[]>(["everyday"]);
   const [defaults, setDefaults] = useState<Record<Meal, string | null>>({ ...SUGGESTED_DEFAULT });
   const [library, setLibrary] = useState<Set<string> | null>(null);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [bodyDraft, setBodyDraft] = useState<BodyDraft>(emptyDraft);
+  const [useBody, setUseBody] = useState(false);
 
   const candidates = useMemo(
     () => CATALOG.filter((d) => cuisines.includes(d.cuisine) && dietAllows(dietPref, d)),
@@ -38,7 +44,7 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
       const popular = candidates.filter((d) => d.popular);
       setLibrary(new Set((popular.length ? popular : candidates).map((d) => d.id)));
     }
-    setStep(3);
+    setStep(4);
   };
 
   const toggleCuisine = (c: Cuisine) =>
@@ -56,13 +62,14 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
     for (const s of STAPLES) lib.add(s);
     // 2026-11-17: was added for everyone; non-Indian users got chapati in their plans.
     if (cuisines.some((c) => c === "south-indian" || c === "north-indian")) for (const s of INDIAN_STAPLES) lib.add(s);
-    onDone({ household, dietPref, cuisines, defaults, dayOverrides: {}, noRepeatDays: 3, library: [...lib] });
+    const body = useBody ? bodyFromDraft(bodyDraft) ?? undefined : undefined;
+    onDone({ household, dietPref, cuisines, defaults, dayOverrides: {}, noRepeatDays: 3, library: [...lib], goals, body });
   };
 
   return (
     <div className="onboard">
       <div className="brand big">Mealer</div>
-      <div className="steps">{[0, 1, 2, 3].map((n) => <span key={n} className={n <= step ? "on" : ""} />)}</div>
+      <div className="steps">{[0, 1, 2, 3, 4].map((n) => <span key={n} className={n <= step ? "on" : ""} />)}</div>
 
       {step === 0 && (
         <section>
@@ -83,11 +90,43 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
               ))}
             </div>
           </div>
-          <button className="primary" onClick={() => setStep(1)}>Next</button>
+          <div className="field goals-box">
+            <span>Any diet goals? <small className="muted">Optional · pick any</small></span>
+            <div className="chips">
+              {GOALS.map((g) => {
+                const on = goals.includes(g);
+                return (
+                  <button key={g} className={`chip ${on ? "sel" : ""}`} aria-pressed={on}
+                    onClick={() => setGoals(on ? goals.filter((x) => x !== g) : [...goals, g])}>
+                    {on ? "✓ " : ""}{GOAL_LABEL[g]}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="muted small">Dishes that fit your goals come first when we plan your week. Nothing is hidden.</p>
+          </div>
+          <div className="row end">
+            <button className="primary" onClick={() => setStep(1)}>Next</button>
+          </div>
         </section>
       )}
 
       {step === 1 && (
+        <section>
+          <h2>Want a calorie target?</h2>
+          <p className="muted">For you, the person planning. Stays on this phone. Skip it and Mealer plans without one.</p>
+          <BodyForm draft={bodyDraft} goals={goals} onChange={setBodyDraft} />
+          <div className="row between">
+            <button onClick={() => setStep(0)}>Back</button>
+            <div className="row">
+              <button className="link" onClick={() => { setUseBody(false); setStep(2); }}>Skip</button>
+              <button className="primary" disabled={!bodyFromDraft(bodyDraft)} onClick={() => { setUseBody(true); setStep(2); }}>Next</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {step === 2 && (
         <section>
           <h2>What did you grow up eating, or love now?</h2>
           <p className="muted">Pick as many as you like. We only suggest dishes from these.</p>
@@ -99,13 +138,13 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
             ))}
           </div>
           <div className="row">
-            <button onClick={() => setStep(0)}>Back</button>
-            <button className="primary" disabled={!cuisines.length} onClick={() => { setLibrary(null); setStep(2); }}>Next</button>
+            <button onClick={() => setStep(1)}>Back</button>
+            <button className="primary" disabled={!cuisines.length} onClick={() => { setLibrary(null); setStep(3); }}>Next</button>
           </div>
         </section>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <section>
           <h2>How do your meals usually look?</h2>
           <p className="muted">You can change any single day later.</p>
@@ -127,13 +166,13 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
             </div>
           ))}
           <div className="row">
-            <button onClick={() => setStep(1)}>Back</button>
+            <button onClick={() => setStep(2)}>Back</button>
             <button className="primary" onClick={goToDishes}>Next</button>
           </div>
         </section>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <section>
           <h2>Tick the dishes you eat</h2>
           <p className="muted">Popular ones are ticked. Your week is planned only from this list, and you can add your own family dishes later.</p>
@@ -157,7 +196,7 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
             <p className="muted">No dishes match these cuisines and diet yet. Go back and add a cuisine, or add your own dishes after setup.</p>
           )}
           <div className="row sticky">
-            <button onClick={() => setStep(2)}>Back</button>
+            <button onClick={() => setStep(3)}>Back</button>
             <button className="primary" disabled={!library?.size} onClick={finish}>Plan my week ({library?.size ?? 0} dishes)</button>
           </div>
         </section>

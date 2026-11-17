@@ -121,6 +121,26 @@ export interface WeekPlan {
 
 export type DietPref = "everything" | "eggetarian" | "vegetarian";
 
+/** Diet goals that steer drafting toward matching dishes. */
+export type Goal = "high-protein" | "low-fat" | "low-carb" | "light";
+export const GOAL_LABEL: Record<Goal, string> = {
+  "high-protein": "High protein", "low-fat": "Low fat", "low-carb": "Low carb", light: "Lighter meals",
+};
+
+export type Activity = "sedentary" | "light" | "moderate" | "very";
+export type Aim = "lose" | "maintain" | "gain";
+
+/** Optional body details, used only to estimate a daily calorie and protein target. Metric. */
+export interface Body {
+  heightCm: number;
+  weightKg: number;
+  age: number;
+  sex: "female" | "male";
+  activity: Activity;
+  aim: Aim;
+  units: "metric" | "us"; // display preference
+}
+
 export interface Profile {
   household: number;
   dietPref: DietPref;
@@ -132,6 +152,8 @@ export interface Profile {
   /** Don't repeat the same dish within this many days. */
   noRepeatDays: number;
   library: string[]; // dish ids the user eats
+  goals?: Goal[];
+  body?: Body;
 }
 
 export interface AppState {

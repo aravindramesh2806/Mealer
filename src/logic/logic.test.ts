@@ -5,6 +5,7 @@ import { CUISINE_LABEL, DAYS, slotKey, type Cuisine, type Profile, type WeekPlan
 import { mondayOf, planningWeek } from "./dates";
 import { draftWeek, eatenHistory } from "./draft";
 import { buildList, canonicalName, formatQty, listAsText } from "./shopping";
+import { calorieTarget, dayMacros, dishMacros, dishTags, entryMacros, lookup, proteinTarget } from "./nutrition";
 
 const dishes = new Map(CATALOG.map((d) => [d.id, d]));
 
@@ -191,5 +192,52 @@ describe("dates", () => {
     expect(mondayOf(new Date(2026, 10, 18))).toBe("2026-11-16"); // Wed
     expect(planningWeek(new Date(2026, 10, 22))).toBe("2026-11-23"); // Sunday -> next week
     expect(planningWeek(new Date(2026, 10, 17))).toBe("2026-11-16"); // Tuesday -> this week
+  });
+});
+
+describe("nutrition", () => {
+  it("every catalog and add-on ingredient has nutrition values", () => {
+    const missing = new Set<string>();
+    for (const d of CATALOG) {
+      for (const ing of [...d.perServing, ...d.addOns.flatMap((a) => a.perServing)]) if (!lookup(ing.item)) missing.add(ing.item);
+    }
+    expect([...missing]).toEqual([]);
+  });
+
+  it("estimates dish macros from ingredients", () => {
+    const m = dishMacros(dishes.get("grilled-chicken-breast")!);
+    expect(Math.round(m.kcal)).toBe(204); // 170 g chicken breast
+    expect(Math.round(m.protein)).toBe(39);
+    expect(dishTags(dishes.get("grilled-chicken-breast")!)).toEqual(["high-protein", "low-fat", "low-carb", "light"]);
+  });
+
+  it("calorie target follows Mifflin-St Jeor with a floor", () => {
+    const b = { heightCm: 175, weightKg: 75, age: 30, sex: "male", activity: "moderate", aim: "lose", units: "metric" } as const;
+    expect(calorieTarget(b)).toBe(2130); // (750 + 1093.75 - 150 + 5) * 1.55 - 500
+    expect(calorieTarget({ ...b, sex: "female", heightCm: 150, weightKg: 45, age: 70, activity: "sedentary" })).toBe(1200);
+    expect(proteinTarget(b)).toBe(120);
+    expect(proteinTarget({ ...b, aim: "maintain" })).toBe(75);
+  });
+
+  it("goals steer drafting toward matching dishes", () => {
+    const lib = CATALOG.filter((d) => d.category === "breakfast").map((d) => d.id);
+    const base = profile({ defaults: { breakfast: "breakfast-one", lunch: null, dinner: null }, library: lib, noRepeatDays: 0 });
+    const proteinOf = (p: Profile) => {
+      const plan = draftWeek("2026-11-23", p, dishes, []);
+      return DAYS.reduce((t, d) => t + entryMacros(plan.slots[slotKey(d, "breakfast")], dishes).protein, 0);
+    };
+    expect(proteinOf({ ...base, goals: ["high-protein"] })).toBeGreaterThan(proteinOf(base));
+  });
+
+  it("a calorie target pulls meals toward its share", () => {
+    const lib = CATALOG.filter((d) => d.category === "main").map((d) => d.id);
+    const small = { heightCm: 155, weightKg: 50, age: 60, sex: "female", activity: "sedentary", aim: "lose", units: "metric" } as const;
+    const big = { heightCm: 190, weightKg: 95, age: 25, sex: "male", activity: "very", aim: "gain", units: "metric" } as const;
+    const kcal = (body: typeof small | typeof big) => {
+      const p = profile({ defaults: { breakfast: null, lunch: "one-dish", dinner: "one-dish" }, library: lib, noRepeatDays: 0, body });
+      const plan = draftWeek("2026-11-23", p, dishes, []);
+      return DAYS.reduce((t, d) => t + dayMacros(plan, d, dishes).kcal, 0);
+    };
+    expect(kcal(big)).toBeGreaterThan(kcal(small));
   });
 });

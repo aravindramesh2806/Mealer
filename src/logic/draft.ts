@@ -4,6 +4,7 @@ import {
   type Day, type Dish, type DietPref, type Meal, type MealEntry, type Profile, type TemplateSlot, type WeekPlan,
 } from "../data/types";
 import { dayNumber } from "./dates";
+import { dishMacros, dishTags, slotBudget } from "./nutrition";
 
 // Rule-based week drafting. No AI and no randomness the user can't explain:
 // suggestions come only from the user's own library, least-recently-eaten first.
@@ -50,6 +51,23 @@ export interface RankContext {
   meal: Meal;
   exclude: Set<string>; // already used in this meal
   seed: string;
+  /** Calories one serving in this slot should aim for (from the user's target), if known. */
+  budget?: number | null;
+}
+
+/** Bonus for fitting the user's goals and calorie budget. Smaller than the no-repeat penalty, so rotation still wins. */
+export function fitScore(dish: Dish, profile: Profile, budget?: number | null): number {
+  let s = 0;
+  const goals = profile.goals ?? [];
+  if (goals.length) {
+    const tags = dishTags(dish);
+    s += 15 * goals.filter((g) => tags.includes(g)).length;
+  }
+  if (budget) {
+    const off = Math.abs(dishMacros(dish).kcal - budget) / budget;
+    s += 20 * (1 - Math.min(1, off));
+  }
+  return s;
 }
 
 /** Candidate dishes for a slot, best first. */
@@ -68,6 +86,8 @@ export function rankCandidates(slot: TemplateSlot, ctx: RankContext): Dish[] {
     for (const n of days) gap = Math.min(gap, Math.abs(ctx.today - n));
     let score = gap === Infinity ? 1000 : gap;
     if (gap < ctx.profile.noRepeatDays) score -= 500; // strongly avoid near repeats
+    // 2026-11-17: prefer dishes that fit diet goals and the calorie target.
+    score += fitScore(dish, ctx.profile, ctx.budget);
     score += hash(ctx.seed + id); // tie-break
     scored.push({ dish, score });
   }
@@ -96,8 +116,10 @@ export function fillEntry(
     if (slot.defaultDishId && profile.library.includes(slot.defaultDishId)) {
       dishId = slot.defaultDishId;
     } else {
+      const mealsToday = MEALS.filter((m) => templateFor(profile, day, m));
+      const budget = slotBudget(profile, meal, mealsToday.length ? mealsToday : [meal], templateId, slot.id);
       const ranked = rankCandidates(slot, {
-        profile, dishes, history, today, meal, exclude, seed: `${weekStart}-${day}-${meal}-${slot.id}`,
+        profile, dishes, history, today, meal, exclude, seed: `${weekStart}-${day}-${meal}-${slot.id}`, budget,
       });
       dishId = ranked[0]?.id ?? null;
     }

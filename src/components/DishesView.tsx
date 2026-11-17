@@ -1,8 +1,11 @@
 import { useState } from "react";
 import {
-  CATEGORY_LABEL, CUISINE_LABEL, SECTIONS,
+  CATEGORY_LABEL, CUISINE_LABEL, GOAL_LABEL, SECTIONS, type Goal,
   type Category, type Cuisine, type Diet, type Dish, type Ingredient, type Meal, type Profile, type Section, type Unit,
 } from "../data/types";
+import { dishMacros, dishTags, type Macros } from "../logic/nutrition";
+
+const macroText = (m: Macros) => `${Math.round(m.protein)} g protein · ${Math.round(m.carbs)} g carbs · ${Math.round(m.fat)} g fat`;
 
 interface Props {
   profile: Profile;
@@ -23,9 +26,11 @@ export function DishesView({ profile, allDishes, onProfile, onAddDish, onDeleteD
     onProfile({ ...profile, library: next });
   };
 
+  const [goal, setGoal] = useState<Goal | "all">("all");
   const q = query.trim().toLowerCase();
   const visible = allDishes.filter((d) =>
-    (q ? d.name.toLowerCase().includes(q) : showAll || profile.cuisines.includes(d.cuisine) || lib.has(d.id) || d.custom));
+    (q ? d.name.toLowerCase().includes(q) : showAll || profile.cuisines.includes(d.cuisine) || lib.has(d.id) || d.custom)
+    && (goal === "all" || dishTags(d).includes(goal)));
 
   const byCuisine = new Map<string, Dish[]>();
   for (const d of visible) {
@@ -42,7 +47,17 @@ export function DishesView({ profile, allDishes, onProfile, onAddDish, onDeleteD
       <label className="muted small toggle">
         <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show all cuisines
       </label>
-      <p className="muted small">{lib.size} dishes in your list. Ticked dishes are the only ones Mealer plans with.</p>
+      <div className="chips filters" role="group" aria-label="Filter by goal">
+        {(["all", ...Object.keys(GOAL_LABEL)] as (Goal | "all")[]).map((g) => (
+          <button key={g} className={`chip small ${goal === g ? "sel" : ""}`} aria-pressed={goal === g} onClick={() => setGoal(g)}>
+            {g === "all" ? "All" : g === "light" ? "Lighter" : GOAL_LABEL[g]}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {lib.size} dishes in your list. Ticked dishes are the only ones Mealer plans with.
+        {goal !== "all" && ` Showing ${visible.length} ${GOAL_LABEL[goal].toLowerCase()} dishes (per serving, estimated).`}
+      </p>
 
       {[...byCuisine.entries()].map(([group, list]) => (
         <div key={group} className="section">
@@ -50,7 +65,10 @@ export function DishesView({ profile, allDishes, onProfile, onAddDish, onDeleteD
           {list.map((d) => (
             <div key={d.id} className="li">
               <input type="checkbox" checked={lib.has(d.id)} onChange={() => toggle(d.id)} />
-              <span className="li-name">{d.name}<small>{CATEGORY_LABEL[d.category]}</small></span>
+              <span className="li-name">{d.name}
+                <small>{CATEGORY_LABEL[d.category]} · {Math.round(dishMacros(d).kcal)} kcal</small>
+                <small>{macroText(dishMacros(d))}{dishTags(d).map((t) => <b key={t} className="tag">{GOAL_LABEL[t]}</b>)}</small>
+              </span>
               {d.custom && <button className="link" onClick={() => confirm(`Delete ${d.name}?`) && onDeleteDish(d.id)}>Delete</button>}
             </div>
           ))}

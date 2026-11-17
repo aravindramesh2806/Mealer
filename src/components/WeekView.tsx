@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { templateById, TEMPLATES } from "../data/templates";
 import {
-  DAY_LABEL, DAYS, MEALS, slotKey,
+  DAY_LABEL, DAYS, GOAL_LABEL, MEALS, slotKey,
   type Day, type Dish, type Meal, type MealEntry, type Profile, type WeekPlan,
 } from "../data/types";
 import { dayNumber } from "../logic/dates";
-import { eatenHistory, fillEntry, rankCandidates } from "../logic/draft";
+import { eatenHistory, fillEntry, rankCandidates, templateFor } from "../logic/draft";
+import { calorieTarget, dayMacros, dishMacros, dishTags, entryMacros, proteinTarget, slotBudget, type Macros } from "../logic/nutrition";
 
 const MEAL_LABEL: Record<Meal, string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
 
@@ -19,8 +20,17 @@ interface Props {
 
 interface Picking { day: Day; meal: Meal; slotId: string }
 
+const fmt = (n: number) => Math.round(n).toLocaleString();
+const macroLine = (m: Macros) => `${fmt(m.kcal)} kcal · ${fmt(m.protein)} g protein · ${fmt(m.carbs)} g carbs · ${fmt(m.fat)} g fat`;
+
+function Stat({ label, value, of }: { label: string; value: string; of?: string }) {
+  return <div className="stat"><span>{label}</span><b>{value}</b>{of && <small>of {of}</small>}</div>;
+}
+
 export function WeekView({ plan, allPlans, profile, dishes, onChange }: Props) {
   const [picking, setPicking] = useState<Picking | null>(null);
+  const kcalTarget = profile.body ? calorieTarget(profile.body) : null;
+  const proTarget = profile.body ? proteinTarget(profile.body, profile.goals) : null;
   const [open, setOpen] = useState<Day | null>(null);
 
   const setEntry = (day: Day, meal: Meal, entry: MealEntry | null) =>
@@ -43,6 +53,7 @@ export function WeekView({ plan, allPlans, profile, dishes, onChange }: Props) {
     <div className="week">
       {DAYS.map((day) => {
         const planned = MEALS.filter((m) => plan.slots[slotKey(day, m)]).length;
+        const totals = dayMacros(plan, day, dishes);
         const isOpen = open === day || open === null;
         return (
           <div key={day} className="day">
@@ -50,13 +61,28 @@ export function WeekView({ plan, allPlans, profile, dishes, onChange }: Props) {
               <b>{DAY_LABEL[day]}</b>
               <span className="muted">{planned ? `${planned} meal${planned > 1 ? "s" : ""}` : "nothing planned"}</span>
             </button>
+            {planned > 0 && (
+              <div className="day-nutrition" aria-label={`${DAY_LABEL[day]} nutrition per person`}>
+                <div className="stats">
+                  <Stat label="Calories" value={fmt(totals.kcal)} of={kcalTarget ? fmt(kcalTarget) : undefined} />
+                  <Stat label="Protein" value={`${fmt(totals.protein)} g`} of={proTarget ? `${proTarget} g` : undefined} />
+                  <Stat label="Carbs" value={`${fmt(totals.carbs)} g`} />
+                  <Stat label="Fat" value={`${fmt(totals.fat)} g`} />
+                </div>
+                {kcalTarget && (
+                  <div className="bar" role="img" aria-label={`${Math.round((100 * totals.kcal) / kcalTarget)} percent of calorie target`}>
+                    <div style={{ width: `${Math.min(100, (100 * totals.kcal) / kcalTarget)}%` }} />
+                  </div>
+                )}
+              </div>
+            )}
             {isOpen && MEALS.map((meal) => {
               const entry = plan.slots[slotKey(day, meal)] ?? null;
               const template = entry ? templateById(entry.templateId) : undefined;
               return (
                 <div key={meal} className={`meal ${entry ? "" : "skipped"}`}>
                   <div className="meal-head">
-                    <span className="meal-name">{MEAL_LABEL[meal]}</span>
+                    <span className="meal-name">{MEAL_LABEL[meal]}{entry && <i className="kcal"> ≈ {fmt(entryMacros(entry, dishes).kcal)} kcal</i>}</span>
                     <select value={entry?.templateId ?? "skip"} onChange={(e) => changeTemplate(day, meal, e.target.value)}>
                       <option value="skip">Skip</option>
                       {TEMPLATES.filter((t) => t.meals.includes(meal)).map((t) => (
@@ -75,6 +101,7 @@ export function WeekView({ plan, allPlans, profile, dishes, onChange }: Props) {
                               <small>{slot.label}</small>
                               <span>{dish ? dish.name : "Tap to choose"}</span>
                               <em>Swap</em>
+                              {dish && <i className="kcal">{macroLine(dishMacros(dish))}</i>}
                             </button>
                             {dish && dish.addOns.length > 0 && (
                               <div className="addons">
@@ -116,20 +143,33 @@ export function WeekView({ plan, allPlans, profile, dishes, onChange }: Props) {
         const slot = templateById(entry.templateId)!.slots.find((s) => s.id === picking.slotId)!;
         const current = entry.items.find((x) => x.slotId === picking.slotId)?.dishId ?? null;
         const exclude = new Set(entry.items.filter((x) => x.slotId !== picking.slotId && x.dishId).map((x) => x.dishId!));
+        const mealsToday = MEALS.filter((m) => templateFor(profile, picking.day, m));
+        const budget = slotBudget(profile, picking.meal, mealsToday.length ? mealsToday : [picking.meal], entry.templateId, picking.slotId);
         const ranked = rankCandidates(slot, {
           profile, dishes, history: history(), today: dayNumber(plan.weekStart, picking.day),
-          meal: picking.meal, exclude, seed: "swap",
+          meal: picking.meal, exclude, seed: "swap", budget,
         });
         return (
           <div className="sheet-bg" onClick={() => setPicking(null)}>
             <div className="sheet" onClick={(e) => e.stopPropagation()}>
               <h3>{slot.label} · {DAY_LABEL[picking.day]} {MEAL_LABEL[picking.meal].toLowerCase()}</h3>
-              <p className="muted">From your dishes. Ones you haven't had in a while come first.</p>
+              {(budget || profile.goals?.length) ? (
+                <div className="aim">
+                  {budget ? <>Aim here: <b>about {fmt(budget)} kcal</b></> : null}
+                  {budget && profile.goals?.length ? " · " : null}
+                  {profile.goals?.length ? `your goals: ${profile.goals.map((g) => GOAL_LABEL[g]).join(", ")}` : null}
+                </div>
+              ) : null}
+              <p className="muted">From your dishes. Ones you haven't had lately come first{budget || profile.goals?.length ? ", then the closest fit" : ""}.</p>
               <div className="pick-list">
                 {ranked.map((d) => (
                   <button key={d.id} className={`pick ${d.id === current ? "sel" : ""}`}
                     onClick={() => { updateItem(picking.day, picking.meal, picking.slotId, (x) => ({ ...x, dishId: d.id, addOnIds: [] })); setPicking(null); }}>
-                    {d.name}
+                    <span>{d.name}</span>
+                    <small className="muted">
+                      {macroLine(dishMacros(d))}
+                      {dishTags(d).map((t) => <b key={t} className="tag">{GOAL_LABEL[t]}</b>)}
+                    </small>
                   </button>
                 ))}
                 {ranked.length === 0 && <p className="muted">No dishes of this kind in your list. Add some in the Dishes tab.</p>}
