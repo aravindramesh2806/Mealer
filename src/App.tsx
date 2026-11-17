@@ -94,7 +94,8 @@ export default function App() {
 
         {tab === "settings" && (
           <SettingsView state={state} profile={profile} onProfile={setProfile}
-            onReplace={setState} onReset={() => setState(emptyState())} />
+            onReplace={setState} onReset={() => setState(emptyState())}
+            onRedraft={() => { draft(profile); setTab("week"); }} />
         )}
       </main>
 

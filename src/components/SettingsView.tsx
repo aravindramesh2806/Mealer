@@ -1,9 +1,10 @@
 import { useRef } from "react";
 import { TEMPLATES } from "../data/templates";
 import {
-  CUISINE_LABEL, DAY_LABEL, DAYS, MEALS, slotKey,
-  type AppState, type Cuisine, type DietPref, type Meal, type Profile,
+  CUISINE_LABEL, DAY_LABEL, DAYS, GOAL_LABEL, MEALS, slotKey,
+  type AppState, type Cuisine, type DietPref, type Goal, type Meal, type Profile,
 } from "../data/types";
+import { BodyForm, bodyFromDraft, emptyDraft, useBodyDraft } from "./BodyForm";
 import { exportState, importState } from "../logic/storage";
 
 const MEAL_LABEL: Record<Meal, string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
@@ -14,11 +15,14 @@ interface Props {
   onProfile: (p: Profile) => void;
   onReplace: (s: AppState) => void;
   onReset: () => void;
+  onRedraft: () => void;
 }
 
-export function SettingsView({ state, profile, onProfile, onReplace, onReset }: Props) {
+export function SettingsView({ state, profile, onProfile, onReplace, onReset, onRedraft }: Props) {
   const file = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<Profile>) => onProfile({ ...profile, ...patch });
+  const [draft, setDraft] = useBodyDraft(profile.body);
+  const goals = profile.goals ?? [];
 
   const setOverride = (key: string, value: string) => {
     const next = { ...profile.dayOverrides };
@@ -67,6 +71,33 @@ export function SettingsView({ state, profile, onProfile, onReplace, onReset }: 
             <b>{profile.noRepeatDays}</b>
             <button onClick={() => set({ noRepeatDays: Math.min(14, profile.noRepeatDays + 1) })}>+</button>
           </div>
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>Calories &amp; goals</h4>
+        <p className="muted small">Optional. Used only on this phone to estimate a daily target and steer new drafts.</p>
+        <BodyForm draft={draft} goals={goals}
+          onChange={(d) => { setDraft(d); const b = bodyFromDraft(d); if (b) set({ body: b }); }} />
+        <div className="field" style={{ marginTop: 12 }}>
+          <span>Diet goals</span>
+          <div className="chips">
+            {(Object.keys(GOAL_LABEL) as Goal[]).map((g) => {
+              const on = goals.includes(g);
+              return (
+                <button key={g} className={`chip small ${on ? "sel" : ""}`} aria-pressed={on}
+                  onClick={() => set({ goals: on ? goals.filter((x) => x !== g) : [...goals, g] })}>
+                  {on ? "✓ " : ""}{GOAL_LABEL[g]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="row between" style={{ marginTop: 12 }}>
+          {profile.body
+            ? <button className="link danger-link" onClick={() => { set({ body: undefined }); setDraft(emptyDraft()); }}>Remove my details</button>
+            : <span />}
+          <button className="primary" onClick={() => confirm("Replace this week's plan with a fresh draft?") && onRedraft()}>Re-draft this week</button>
         </div>
       </div>
 
