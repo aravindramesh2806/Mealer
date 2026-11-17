@@ -1,7 +1,7 @@
 {
   "name": "Mealer",
   "short_name": "Mealer",
-  "description": "Plan your week of home meals and get one shopping list.",
+  "description": "Plan a week of home meals in 2 minutes and shop once with one list.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f5f0",
