@@ -21,6 +21,8 @@ npm run test:e2e # 36 click-through flow tests on a phone-sized screen
 npm run build    # production build in dist/
 ```
 
+Every pull request and push to `main` runs the same checks on GitHub Actions (`.github/workflows/ci.yml`): type check, logic tests, build and flow tests.
+
 ## Deploy for free (Cloudflare Pages)
 
 1. dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git → pick `mealer`.
