@@ -2,6 +2,7 @@
 
 Plan your week of home meals on Sunday, get one shopping list, and shop once.
 
+- **Two-minute setup, no account.** Welcome screen, four short steps (who's eating, cuisines, how you eat, optional goals), then a preview of your first week. Popular dishes are picked for you; ticking dishes yourself is optional.
 - **Your meals, not random ones.** You pick the cuisines you grew up with or love (American, South/North Indian, Chinese, Mexican, Italian, Mediterranean, Thai, Japanese, Korean, Vietnamese) and tick the dishes you actually eat. Mealer only plans from that list.
 - **Meal patterns.** Each meal follows a pattern: one breakfast dish, one-dish meal, main + side, rice + 2 veg + dal, roti + curry, rice/noodles + main + veg.
 - **Rotation.** The weekly draft puts dishes you haven't had in a while first and avoids repeats within N days (you choose N).
@@ -42,6 +43,7 @@ On a phone, open the link and use **Add to Home Screen** (Safari share menu on i
 | `src/data/nutrition.ts` | Approximate nutrition per ingredient (per 100 g/ml or per piece) |
 | `src/logic/nutrition.ts` | Dish/meal/day estimates, goal tags, calorie target (Mifflin–St Jeor), per-slot calorie budget |
 | `src/logic/shopping.ts` | Shopping list: scaling, merging, formatting, share text |
+| `src/logic/setup.ts` | First-time setup: meal styles to patterns, style guess, starter dish list |
 | `src/logic/storage.ts` | Saves to the device (localStorage), backup/restore |
 | `src/components/` | Onboarding, Week, List, Dishes, Settings screens |
 
