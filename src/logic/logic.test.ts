@@ -57,13 +57,24 @@ describe("cuisines", () => {
 
   it("the newer cuisines fill every dish role on their own", () => {
     const roles = ["breakfast", "main", "protein", "veg", "dal", "starch", "salad"] as const;
-    for (const c of ["thai", "japanese", "korean", "vietnamese", "mexican", "italian", "mediterranean"] as Cuisine[]) {
+    for (const c of ["everyday", "thai", "japanese", "korean", "vietnamese", "french", "caribbean", "mexican", "italian", "mediterranean", "american", "chinese"] as Cuisine[]) {
       for (const r of roles) expect(of(c).some((d) => d.category === r), `${c} ${r}`).toBe(true);
     }
   });
 
+  it("everyday basics include eggs and oats for breakfast, and lunch/dinner plates", () => {
+    const ev = of("everyday");
+    for (const id of ["eggs-toast", "overnight-oats", "veg-omelette", "hot-oatmeal", "bagel-cream-cheese", "croissant-jam"]) expect(ev.some((d) => d.id === id), id).toBe(true);
+    expect(ev.filter((d) => d.category === "main" && d.meals.includes("lunch") && d.meals.includes("dinner")).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("non-Indian dishes outnumber Indian ones at least 3 to 1", () => {
+    const indian = CATALOG.filter((d) => d.cuisine === "south-indian" || d.cuisine === "north-indian").length;
+    expect(CATALOG.length - indian).toBeGreaterThanOrEqual(3 * indian);
+  });
+
   it("a single new cuisine drafts a full week", () => {
-    for (const c of ["thai", "japanese", "korean", "vietnamese"] as Cuisine[]) {
+    for (const c of ["thai", "japanese", "korean", "vietnamese", "french", "caribbean"] as Cuisine[]) {
       const p = profile({
         cuisines: [c],
         defaults: { breakfast: "breakfast-one", lunch: "one-dish", dinner: "rice-and-dishes" },

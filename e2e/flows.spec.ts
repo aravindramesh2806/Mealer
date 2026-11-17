@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Flow tests: each test starts from a fresh phone (empty storage).
 
 const CUISINES = ["American", "South Indian", "North Indian", "Chinese", "Mexican", "Italian", "Mediterranean",
-  "Thai", "Japanese", "Korean", "Vietnamese"];
+  "Thai", "Japanese", "Korean", "Vietnamese", "French", "Caribbean"];
 const DIETS = ["Everything", "Vegetarian + eggs", "Vegetarian"];
 
 interface Setup {
@@ -90,6 +90,31 @@ test.describe("onboarding creates a plan", () => {
     await expect(page.locator(".tabs")).toBeVisible();
     expect(errors).toEqual([]);
   });
+});
+
+test("everyday basics are on by default with any cuisine", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("button", { name: "Everyday basics", exact: true })).toHaveClass(/sel/);
+  await page.getByRole("button", { name: "Thai", exact: true }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("button", { name: "Overnight oats" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Scrambled eggs & toast" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bagel & cream cheese" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Croissant & jam" })).toBeVisible();
+});
+
+test("non-Indian setup does not add chapati", async ({ page }) => {
+  await onboard(page, { cuisines: ["American", "Italian"] });
+  await page.locator(".tabs button", { hasText: "Dishes" }).click();
+  await expect(page.getByText("Chapati / roti")).toHaveCount(0);
+});
+
+test("Indian setup still adds chapati", async ({ page }) => {
+  await onboard(page, { cuisines: ["North Indian"] });
+  await page.locator(".tabs button", { hasText: "Dishes" }).click();
+  await expect(page.getByText("Chapati / roti").first()).toBeVisible();
 });
 
 test.describe("using the plan", () => {

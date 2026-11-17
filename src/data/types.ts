@@ -26,14 +26,15 @@ export const CATEGORY_LABEL: Record<Category, string> = {
 };
 
 export type Cuisine =
-  | "american" | "south-indian" | "north-indian" | "chinese"
+  | "everyday" | "american" | "south-indian" | "north-indian" | "chinese"
   | "mexican" | "italian" | "mediterranean"
-  | "thai" | "japanese" | "korean" | "vietnamese";
+  | "thai" | "japanese" | "korean" | "vietnamese" | "french" | "caribbean";
 
 export const CUISINE_LABEL: Record<Cuisine, string> = {
-  american: "American", "south-indian": "South Indian", "north-indian": "North Indian",
+  everyday: "Everyday basics", american: "American", "south-indian": "South Indian", "north-indian": "North Indian",
   chinese: "Chinese", mexican: "Mexican", italian: "Italian", mediterranean: "Mediterranean",
   thai: "Thai", japanese: "Japanese", korean: "Korean", vietnamese: "Vietnamese",
+  french: "French", caribbean: "Caribbean",
 };
 
 /** veg = no meat/fish/egg; egg = contains egg but no meat; nonveg = meat or fish. */
