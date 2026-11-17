@@ -40,7 +40,7 @@ export default function App() {
 
   if (!profile) {
     return (
-      <Onboarding onDone={(p) => {
+      <Onboarding onRestore={setState} onDone={(p) => {
         const first = draftWeek(weekStart, p, dishes, []);
         setState((s) => ({ ...s, profile: p, plans: { ...s.plans, [first.weekStart]: first } }));
       }} />

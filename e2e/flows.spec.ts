@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// Node global available in Playwright tests (no @types/node in this project).
+declare const Buffer: { from(s: string): never };
+
 // Flow tests: each test starts from a fresh phone (empty storage).
 
 const CUISINES = ["American", "South Indian", "North Indian", "Chinese", "Mexican", "Italian", "Mediterranean",
@@ -9,10 +12,12 @@ const DIETS = ["Everything", "Vegetarian + eggs", "Vegetarian"];
 interface Setup {
   diet?: string;
   cuisines?: string[];
-  /** Card name per meal (breakfast, lunch, dinner); omitted = keep the suggested one. */
+  /** Pattern name per meal (breakfast, lunch, dinner), set in Settings after setup; omitted = keep. */
   patterns?: (string | undefined)[];
+  /** Meal style card title on the "How do you usually eat?" step. */
+  style?: string;
   goals?: string[];
-  /** Fill the calorie step (metric); omitted = Skip. */
+  /** Fill the calorie target (metric); omitted with no goals = Skip. */
   body?: { height: string; weight: string; age: string; sex: "Female" | "Male"; aim: "Lose" | "Keep" | "Gain" };
 }
 
@@ -23,42 +28,57 @@ function trackErrors(page: Page): string[] {
   return errors;
 }
 
+const optionByTitle = (page: Page, title: string) =>
+  page.locator(".option, .cuisine").filter({ has: page.locator("b", { hasText: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }) });
+
+/** Go through first-time setup. Patterns, when given, are set in Settings after setup (as a user would). */
 async function onboard(page: Page, s: Setup = {}) {
   await page.goto("/");
+  await page.getByRole("button", { name: "Get started" }).click();
+
   await expect(page.getByRole("heading", { name: "Who are you cooking for?" })).toBeVisible();
-  await page.getByRole("button", { name: s.diet ?? "Everything", exact: true }).click();
-  for (const g of s.goals ?? []) await page.getByRole("button", { name: g, exact: true }).click();
+  await optionByTitle(page, s.diet ?? "Everything").click();
   await page.getByRole("button", { name: "Next" }).click();
 
-  await expect(page.getByRole("heading", { name: "Want a calorie target?" })).toBeVisible();
-  if (s.body) {
-    await page.getByLabel("Height (cm)").fill(s.body.height);
-    await page.getByLabel("Weight (kg)").fill(s.body.weight);
-    await page.getByLabel("Age").fill(s.body.age);
-    await page.getByLabel("Sex (for the formula)").selectOption({ label: s.body.sex });
-    await page.getByRole("button", { name: s.body.aim, exact: true }).click();
-    await page.getByRole("button", { name: "Next" }).click();
-  } else {
+  await expect(page.getByRole("heading", { name: "What do you like to eat?" })).toBeVisible();
+  for (const c of s.cuisines ?? ["South Indian", "American"]) await optionByTitle(page, c).click();
+  await page.getByRole("button", { name: /^Next/ }).click();
+
+  await expect(page.getByRole("heading", { name: "How do you usually eat?" })).toBeVisible();
+  if (s.style) await optionByTitle(page, s.style).click();
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await expect(page.getByRole("heading", { name: "Anything you're aiming for?" })).toBeVisible();
+  if (!s.goals?.length && !s.body) {
     await page.getByRole("button", { name: "Skip" }).click();
+  } else {
+    for (const g of s.goals ?? []) await page.getByRole("button", { name: g, exact: true }).click();
+    if (s.body) {
+      await page.getByRole("button", { name: /Add a daily calorie target/ }).click();
+      await page.getByLabel("Height (cm)").fill(s.body.height);
+      await page.getByLabel("Weight (kg)").fill(s.body.weight);
+      await page.getByLabel("Age").fill(s.body.age);
+      await page.getByLabel("Sex (for the formula)").selectOption({ label: s.body.sex });
+      await page.getByRole("button", { name: s.body.aim, exact: true }).click();
+    }
+    await page.getByRole("button", { name: "Plan my week" }).click();
   }
 
-  for (const c of s.cuisines ?? ["South Indian", "American"]) {
-    await page.getByRole("button", { name: c, exact: true }).click();
-  }
-  await page.getByRole("button", { name: "Next" }).click();
-
-  await expect(page.getByRole("heading", { name: "How do your meals usually look?" })).toBeVisible();
-  const fields = page.locator(".field");
-  for (const [k, name] of (s.patterns ?? []).entries()) {
-    if (name) await fields.nth(k).locator(".card", { hasText: name }).click();
-  }
-  await page.getByRole("button", { name: "Next" }).click();
-
-  await expect(page.getByRole("heading", { name: "Tick the dishes you eat" })).toBeVisible();
-  const plan = page.getByRole("button", { name: /Plan my week/ });
-  await expect(plan).toBeEnabled();
-  await plan.click();
+  await expect(page.getByRole("heading", { name: "Your first week is ready" })).toBeVisible();
+  await page.getByRole("button", { name: "See my week" }).click();
   await expect(page.locator(".tabs")).toBeVisible({ timeout: 5000 });
+
+  if (s.patterns?.some(Boolean)) {
+    page.once("dialog", (d) => d.accept());
+    await page.locator(".tabs button", { hasText: "Settings" }).click();
+    const usual = page.locator(".section", { has: page.getByRole("heading", { name: "Usual meals" }) });
+    const meals = ["Breakfast", "Lunch", "Dinner"];
+    for (const [k, name] of s.patterns.entries()) {
+      if (name) await usual.locator(".li", { hasText: meals[k] }).locator("select").selectOption({ label: name });
+    }
+    await page.getByRole("button", { name: "Re-draft this week" }).click();
+    await expect(page.locator(".day")).toHaveCount(7);
+  }
 }
 
 test.describe("onboarding creates a plan", () => {
@@ -92,17 +112,18 @@ test.describe("onboarding creates a plan", () => {
   test("going back and changing cuisines still works", async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto("/");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await optionByTitle(page, "Italian").click();
+    await page.getByRole("button", { name: /^Next/ }).click();
+    await page.getByRole("button", { name: "Back" }).click();
+    await optionByTitle(page, "Mexican").click();
+    await page.getByRole("button", { name: /^Next/ }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Skip" }).click();
-    await page.getByRole("button", { name: "Italian", exact: true }).click();
-    await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: "Back" }).click();
-    await page.getByRole("button", { name: "Back" }).click();
-    await page.getByRole("button", { name: "Mexican", exact: true }).click();
-    await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Choose my dishes myself instead" }).click();
     await expect(page.getByRole("button", { name: "Chicken burrito bowl" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Spaghetti marinara" })).toBeVisible();
     await page.getByRole("button", { name: /Plan my week/ }).click();
     await expect(page.locator(".tabs")).toBeVisible();
     expect(errors).toEqual([]);
@@ -111,12 +132,14 @@ test.describe("onboarding creates a plan", () => {
 
 test("everyday basics are on by default with any cuisine", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(optionByTitle(page, "Everyday basics")).toHaveClass(/sel/);
+  await optionByTitle(page, "Thai").click();
+  await page.getByRole("button", { name: /^Next/ }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Skip" }).click();
-  await expect(page.getByRole("button", { name: "Everyday basics", exact: true })).toHaveClass(/sel/);
-  await page.getByRole("button", { name: "Thai", exact: true }).click();
-  await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Choose my dishes myself instead" }).click();
   await expect(page.getByRole("button", { name: "Overnight oats" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Scrambled eggs & toast" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bagel & cream cheese" })).toBeVisible();
@@ -233,10 +256,12 @@ test.describe("nutrition, goals and calorie target", () => {
   test("calorie step shows the target and the week tracks it", async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto("/");
+    await page.getByRole("button", { name: "Get started" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-    const next = page.getByRole("button", { name: "Next" });
-    await expect(next).toBeDisabled();
-    await expect(page.getByText("Enter height, weight and age")).toBeVisible();
+    await page.getByRole("button", { name: /^Next/ }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: /Add a daily calorie target/ }).click();
+    await expect(page.getByRole("button", { name: "Fill in height, weight and age" })).toBeDisabled();
     await page.getByLabel("Height (cm)").fill("175");
     await page.getByLabel("Weight (kg)").fill("75");
     await page.getByLabel("Age").fill("30");
@@ -247,10 +272,8 @@ test.describe("nutrition, goals and calorie target", () => {
     await page.getByRole("button", { name: "lb · in" }).click();
     await expect(page.getByLabel("Weight (lb)")).toHaveValue("165");
     await expect(page.locator(".target-num")).toContainText("2,130");
-    await next.click();
-    await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: /Plan my week/ }).click();
+    await page.getByRole("button", { name: "Plan my week" }).click();
+    await page.getByRole("button", { name: "See my week" }).click();
     const monday = page.getByLabel("Monday nutrition per person");
     await expect(monday).toContainText("of 2,130");
     await expect(monday).toContainText("of 120 g");
@@ -302,5 +325,82 @@ test.describe("nutrition, goals and calorie target", () => {
     await page.getByRole("button", { name: "Remove my details" }).click();
     await page.locator(".tabs button", { hasText: "Week" }).click();
     await expect(page.getByLabel("Monday nutrition per person")).not.toContainText("of ");
+  });
+});
+
+test.describe("friendly first-time setup", () => {
+  test("welcome screen pitches the app and promises no account", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Plan a week of home meals in 2 minutes." })).toBeVisible();
+    await expect(page.getByText("No account, no sign-in")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
+  });
+
+  test("ready screen previews Monday before finishing", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await optionByTitle(page, "Mexican").click();
+    await page.getByRole("button", { name: /^Next/ }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Skip" }).click();
+    const preview = page.getByRole("region", { name: "Monday preview" });
+    await expect(preview).toContainText("Breakfast");
+    await expect(preview).toContainText("Dinner");
+    await expect(preview).toContainText("kcal");
+    await expect(page.getByText(/We picked \d+ dishes from Everyday basics and Mexican/)).toBeVisible();
+  });
+
+  test("only planned meals are drafted", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: /^Next/ }).click();
+    await page.getByRole("switch", { name: /Breakfast/ }).click();
+    await page.getByRole("switch", { name: /Lunch/ }).click();
+    await page.getByRole("switch", { name: /Dinner/ }).click();
+    await expect(page.getByRole("button", { name: "Plan at least one meal" })).toBeDisabled();
+    await page.getByRole("switch", { name: /Dinner/ }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Skip" }).click();
+    await page.getByRole("button", { name: "See my week" }).click();
+    const monday = page.locator(".day").first();
+    await expect(monday.locator(".meal").nth(0)).toHaveClass(/skipped/);
+    await expect(monday.locator(".meal").nth(1)).toHaveClass(/skipped/);
+    await expect(monday.locator(".meal").nth(2)).not.toHaveClass(/skipped/);
+  });
+
+  test("meal style is guessed from cuisines and can be changed", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await optionByTitle(page, "North Indian").click();
+    await page.getByRole("button", { name: /^Next/ }).click();
+    await expect(optionByTitle(page, "Indian home style")).toHaveClass(/sel/);
+    await optionByTitle(page, "One dish").click();
+    await expect(optionByTitle(page, "One dish")).toHaveClass(/sel/);
+  });
+
+  test("restore a backup from the welcome screen", async ({ page }) => {
+    await onboard(page, { cuisines: ["Thai"] });
+    const backup = await page.evaluate(() => localStorage.getItem("mealer:v1"));
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
+    await page.getByLabel("Backup file").setInputFiles({ name: "mealer-backup.json", mimeType: "application/json", buffer: Buffer.from(backup!) });
+    await expect(page.locator(".tabs")).toBeVisible();
+    await expect(page.locator(".day")).toHaveCount(7);
+  });
+
+  test("no sideways scroll on any setup screen", async ({ page }) => {
+    await page.goto("/");
+    const check = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await check();
+    await page.getByRole("button", { name: "Get started" }).click(); await check();
+    await page.getByRole("button", { name: "Next" }).click(); await check();
+    await page.getByRole("button", { name: /^Next/ }).click(); await check();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: /Add a daily calorie target/ }).click(); await check();
+    await page.getByRole("button", { name: "Skip" }).click(); await check();
   });
 });

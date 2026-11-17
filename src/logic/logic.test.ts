@@ -5,6 +5,7 @@ import { CUISINE_LABEL, DAYS, slotKey, type Cuisine, type Profile, type WeekPlan
 import { mondayOf, planningWeek } from "./dates";
 import { draftWeek, eatenHistory } from "./draft";
 import { buildList, canonicalName, formatQty, listAsText } from "./shopping";
+import { defaultsFor, guessStyle, MEAL_STYLES, STAPLES, starterLibrary } from "./setup";
 import { calorieTarget, dayMacros, dishMacros, dishTags, entryMacros, lookup, proteinTarget } from "./nutrition";
 
 const dishes = new Map(CATALOG.map((d) => [d.id, d]));
@@ -239,5 +240,50 @@ describe("nutrition", () => {
       return DAYS.reduce((t, d) => t + dayMacros(plan, d, dishes).kcal, 0);
     };
     expect(kcal(big)).toBeGreaterThan(kcal(small));
+  });
+});
+
+describe("first-time setup", () => {
+  const all = { breakfast: true, lunch: true, dinner: true };
+
+  it("turns a meal style into meal patterns", () => {
+    expect(defaultsFor("plate", all)).toEqual({ breakfast: "breakfast-one", lunch: "one-dish", dinner: "main-sides" });
+    expect(defaultsFor("indian", { ...all, breakfast: false })).toEqual({ breakfast: null, lunch: "indian-veg-lunch", dinner: "roti-curry" });
+    expect(defaultsFor("simple", { breakfast: true, lunch: false, dinner: true }).lunch).toBeNull();
+  });
+
+  it("guesses a style from the cuisines picked", () => {
+    expect(guessStyle(["everyday", "north-indian"])).toBe("indian");
+    expect(guessStyle(["everyday", "japanese", "korean"])).toBe("asian");
+    expect(guessStyle(["everyday", "italian", "thai", "mexican"])).toBe("plate");
+    expect(guessStyle(["everyday"])).toBe("plate");
+    expect(guessStyle(["everyday", "mexican", "thai"])).toBe("plate"); // a tie stays with plate
+  });
+
+  it("starter dishes fill every slot of the chosen patterns, for every cuisine and diet", () => {
+    for (const c of Object.keys(CUISINE_LABEL) as Cuisine[]) {
+      for (const dietPref of ["everything", "eggetarian", "vegetarian"] as const) {
+        for (const style of MEAL_STYLES.map((s) => s.id)) {
+          const cuisines: Cuisine[] = c === "everyday" ? ["everyday"] : ["everyday", c];
+          const defaults = defaultsFor(style, all);
+          const library = starterLibrary(CATALOG, cuisines, dietPref, defaults);
+          const plan = draftWeek("2026-11-23", profile({ cuisines, dietPref, defaults, library }), dishes, []);
+          for (const day of DAYS) {
+            for (const meal of ["breakfast", "lunch", "dinner"] as const) {
+              for (const it of plan.slots[slotKey(day, meal)]!.items) {
+                expect(it.dishId, `${c}/${dietPref}/${style} ${day} ${meal} ${it.slotId}`).not.toBeNull();
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("starter dishes come only from the chosen cuisines plus staples", () => {
+    const lib = starterLibrary(CATALOG, ["everyday", "thai"], "everything", defaultsFor("plate", all));
+    for (const id of lib) expect(["everyday", "thai"].includes(dishes.get(id)!.cuisine) || STAPLES.includes(id), id).toBe(true);
+    expect(lib).not.toContain("chapati");
+    expect(starterLibrary(CATALOG, ["north-indian"], "everything", defaultsFor("indian", all))).toContain("chapati");
   });
 });
