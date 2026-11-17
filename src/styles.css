@@ -9,6 +9,7 @@
   --accent-text: #ffffff;
   --warn: #b3412e;
   --radius: 14px;
+  --control: #b9b4a9; /* outlines of unselected radios, ticks and off switches */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,6 +23,7 @@
     --accent-soft: #23372c;
     --accent-text: #0f1a14;
     --warn: #ef8a74;
+    --control: #66706a;
     color-scheme: dark;
   }
 }
@@ -244,17 +246,17 @@ main { padding: 12px 16px; }
 .panel.list { padding: 0; overflow: hidden; }
 .option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 62px; padding: 10px 16px; border-radius: 14px; text-align: left; }
 .option.sel { border: 2px solid var(--accent); background: var(--accent-soft); padding: 9px 15px; }
-.radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); box-sizing: border-box; }
-.radio.on { border: 7px solid var(--accent); }
+.radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--control); background: var(--surface); box-sizing: border-box; }
+.radio.on { border: 7px solid var(--accent); background: var(--accent-text); }
 .cuisine-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .cuisine { display: grid; gap: 4px; min-height: 70px; padding: 10px 12px; border-radius: 14px; text-align: left; align-content: start; }
 .cuisine.sel { border: 2px solid var(--accent); background: var(--accent-soft); padding: 9px 11px; }
 .cuisine-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-.tick { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); box-sizing: border-box; color: transparent; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.tick { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--control); box-sizing: border-box; color: transparent; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .tick.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .switch-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 6px 16px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; text-align: left; }
 .switch-row:first-child { border-top: 0; }
-.switch { position: relative; flex: none; width: 50px; height: 30px; border-radius: 15px; background: var(--line); }
+.switch { position: relative; flex: none; width: 50px; height: 30px; border-radius: 15px; background: var(--control); }
 .switch i { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left 0.15s; }
 .switch.on { background: var(--accent); }
 .switch.on i { left: 23px; }
