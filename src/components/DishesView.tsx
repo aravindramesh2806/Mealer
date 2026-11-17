@@ -25,7 +25,7 @@ export function DishesView({ profile, allDishes, onProfile, onAddDish, onDeleteD
 
   const q = query.trim().toLowerCase();
   const visible = allDishes.filter((d) =>
-    (q ? d.name.toLowerCase().includes(q) : showAll || profile.cuisines.includes(d.cuisine) || d.custom));
+    (q ? d.name.toLowerCase().includes(q) : showAll || profile.cuisines.includes(d.cuisine) || lib.has(d.id) || d.custom));
 
   const byCuisine = new Map<string, Dish[]>();
   for (const d of visible) {

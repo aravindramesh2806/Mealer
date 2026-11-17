@@ -14,14 +14,16 @@ const SUGGESTED_DEFAULT: Record<Meal, string> = {
   breakfast: "breakfast-one", lunch: "one-dish", dinner: "main-sides",
 };
 
-/** Staples that make templates work (rice for Indian lunch, roti for curry). */
-const STAPLES = ["steamed-rice", "chapati"];
+/** Staples that make templates work: plain rice for everyone, roti only for Indian kitchens. */
+const STAPLES = ["steamed-rice"];
+const INDIAN_STAPLES = ["chapati"];
 
 export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   const [step, setStep] = useState(0);
   const [household, setHousehold] = useState(2);
   const [dietPref, setDietPref] = useState<DietPref>("everything");
-  const [cuisines, setCuisines] = useState<Cuisine[]>([]);
+  // 2026-11-17: everyday basics (eggs, oats, sandwiches) on by default; was empty.
+  const [cuisines, setCuisines] = useState<Cuisine[]>(["everyday"]);
   const [defaults, setDefaults] = useState<Record<Meal, string | null>>({ ...SUGGESTED_DEFAULT });
   const [library, setLibrary] = useState<Set<string> | null>(null);
 
@@ -52,6 +54,8 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   const finish = () => {
     const lib = new Set(library ?? []);
     for (const s of STAPLES) lib.add(s);
+    // 2026-11-17: was added for everyone; non-Indian users got chapati in their plans.
+    if (cuisines.some((c) => c === "south-indian" || c === "north-indian")) for (const s of INDIAN_STAPLES) lib.add(s);
     onDone({ household, dietPref, cuisines, defaults, dayOverrides: {}, noRepeatDays: 3, library: [...lib] });
   };
 
