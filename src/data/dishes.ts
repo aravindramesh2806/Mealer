@@ -214,7 +214,7 @@ export const CATALOG: Dish[] = [
   dish("tacos", "Ground beef tacos", "mexican", "main", LD, "nonveg",
     [i("Taco shells / small tortillas", 3, "pc", G), i("Ground beef", 120, "g", M), i("Lettuce", 20, "g", P), i("Shredded cheese", 20, "g", D), i("Tomato", 0.5, "pc", P)], ["taco seasoning", "salsa"], [avocado], true),
   dish("bean-quesadilla", "Bean & cheese quesadilla", "mexican", "main", LD, "veg",
-    [i("Tortillas (large)", 1, "pc", G), i("Black beans (can)", 70, "g", PA), i("Shredded cheese", 40, "g", D)], ["salsa"], [add("sour-cream", "Sour cream", i("Sour cream", 30, "g", D))]),
+    [i("Tortillas (large)", 1, "pc", G), i("Black beans (can)", 70, "g", PA), i("Shredded cheese", 40, "g", D)], ["salsa"], [add("sour-cream", "Sour cream", i("Sour cream", 30, "g", D))], true),
   dish("chicken-fajitas", "Chicken fajitas", "mexican", "main", LD, "nonveg",
     [i("Tortillas (small)", 3, "pc", G), i("Chicken breast", 140, "g", M), i("Bell pepper", 0.75, "pc", P), i("Onion", 0.5, "pc", P)], ["fajita seasoning", "lime", "oil"], [avocado, cheese]),
 

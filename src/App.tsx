@@ -20,8 +20,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("week");
   const [weekStart, setWeekStart] = useState(planningWeek);
 
-  useEffect(() => saveState(state), [state]);
-  useEffect(() => window.scrollTo(0, 0), [tab, weekStart, state.profile === null]);
+  // Effects must return nothing: newer browsers return a Promise from scrollTo,
+  // which React would try to call as a cleanup function and crash.
+  useEffect(() => { saveState(state); }, [state]);
+  useEffect(() => { window.scrollTo(0, 0); }, [tab, weekStart, state.profile === null]);
 
   const allDishes = useMemo(() => [...CATALOG, ...state.customDishes], [state.customDishes]);
   const dishes = useMemo(() => new Map<string, Dish>(allDishes.map((d) => [d.id, d])), [allDishes]);

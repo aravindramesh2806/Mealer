@@ -31,7 +31,11 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   );
 
   const goToDishes = () => {
-    if (!library) setLibrary(new Set(candidates.filter((d) => d.popular).map((d) => d.id)));
+    if (!library) {
+      // Pre-tick popular dishes; if a cuisine/diet mix has none, pre-tick everything offered.
+      const popular = candidates.filter((d) => d.popular);
+      setLibrary(new Set((popular.length ? popular : candidates).map((d) => d.id)));
+    }
     setStep(3);
   };
 
@@ -145,6 +149,9 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
               </div>
             );
           })}
+          {candidates.length === 0 && (
+            <p className="muted">No dishes match these cuisines and diet yet. Go back and add a cuisine, or add your own dishes after setup.</p>
+          )}
           <div className="row sticky">
             <button onClick={() => setStep(2)}>Back</button>
             <button className="primary" disabled={!library?.size} onClick={finish}>Plan my week ({library?.size ?? 0} dishes)</button>

@@ -15,6 +15,7 @@ Plan your week of home meals on Sunday, get one shopping list, and shop once.
 npm install
 npm run dev      # http://localhost:5173
 npm test         # logic tests
+npm run test:e2e # 36 click-through flow tests on a phone-sized screen
 npm run build    # production build in dist/
 ```
 
