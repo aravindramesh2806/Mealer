@@ -1,0 +1,11 @@
+// Cloudflare Workers static-assets deploy. Build first (`npm run build`), then `npx wrangler deploy`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mealler",
+  "compatibility_date": "2026-11-16",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
